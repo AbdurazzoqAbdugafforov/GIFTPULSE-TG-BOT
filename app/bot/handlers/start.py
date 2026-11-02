@@ -8,6 +8,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     MenuButtonWebApp,
+    MenuButtonDefault,
     WebAppInfo,
 )
 from aiogram.fsm.context import FSMContext
@@ -25,12 +26,23 @@ router = Router(name="start_router")
 def get_mini_app_inline_keyboard(lang: str = "uz") -> InlineKeyboardMarkup:
     """Button to launch Telegram Mini App."""
     btn_text = i18n.get("btn_open_miniapp", lang=lang)
+    if settings.is_miniapp_https:
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=btn_text,
+                        web_app=WebAppInfo(url=settings.MINI_APP_URL.strip()),
+                    )
+                ]
+            ]
+        )
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
                     text=btn_text,
-                    web_app=WebAppInfo(url=settings.MINI_APP_URL),
+                    callback_data="menu:miniapp_info",
                 )
             ]
         ]
@@ -44,12 +56,18 @@ async def handle_start(message: Message, state: FSMContext, db_user: User, is_ne
     lang = db_user.language or settings.DEFAULT_LANGUAGE
     name = message.from_user.first_name if message.from_user else "Foydalanuvchi"
 
-    # Set bottom-left chat menu button to launch WebApp
+    # Set bottom-left chat menu button to launch WebApp only if valid HTTPS is configured
     try:
-        await message.bot.set_chat_menu_button(
-            chat_id=message.chat.id,
-            menu_button=MenuButtonWebApp(text="GiftPulse", web_app=WebAppInfo(url=settings.MINI_APP_URL)),
-        )
+        if settings.is_miniapp_https:
+            await message.bot.set_chat_menu_button(
+                chat_id=message.chat.id,
+                menu_button=MenuButtonWebApp(text="GiftPulse", web_app=WebAppInfo(url=settings.MINI_APP_URL.strip())),
+            )
+        else:
+            await message.bot.set_chat_menu_button(
+                chat_id=message.chat.id,
+                menu_button=MenuButtonDefault(),
+            )
     except Exception:
         pass
 
@@ -128,3 +146,46 @@ async def handle_language_choice(callback: CallbackQuery, db_user: User) -> None
         reply_markup=get_main_menu_keyboard(chosen_lang),
         parse_mode="HTML",
     )
+
+
+@router.message(F.text.in_({"🚀 GiftPulse Mini App-ni Ochish", "🚀 Open GiftPulse Mini App", "🚀 Открыть GiftPulse Mini App"}))
+@router.message(F.text.contains("Mini App"))
+async def handle_miniapp_button_press(message: Message, db_user: User) -> None:
+    """Handle click on Mini App reply button when not in HTTPS webapp mode."""
+    lang = getattr(db_user, "language", None) or settings.DEFAULT_LANGUAGE
+    if lang == "uz":
+        text = (
+            "ℹ️ <b>GiftPulse Mini App</b>\n\n"
+            "Telegram xavfsizlik talablariga ko'ra, Mini App faqat <b>HTTPS</b> havolasi orqali ochiladi.\n\n"
+            "Serveringizga domen yoki SSL ulangach, <code>.env</code> faylida quyidagicha sozlang:\n"
+            "<code>MINI_APP_URL=https://sizning-domeningiz.com</code>"
+        )
+    elif lang == "ru":
+        text = (
+            "ℹ️ <b>GiftPulse Mini App</b>\n\n"
+            "По требованиям Telegram, Mini App может открываться только по защищенному протоколу <b>HTTPS</b>.\n\n"
+            "После настройки SSL укажите в <code>.env</code>:\n"
+            "<code>MINI_APP_URL=https://vash-domen.com</code>"
+        )
+    else:
+        text = (
+            "ℹ️ <b>GiftPulse Mini App</b>\n\n"
+            "According to Telegram security policies, Mini Apps require a secure <b>HTTPS</b> URL.\n\n"
+            "Please configure an HTTPS domain/tunnel and set in <code>.env</code>:\n"
+            "<code>MINI_APP_URL=https://your-domain.com</code>"
+        )
+    await message.answer(text, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "menu:miniapp_info")
+async def handle_miniapp_info_callback(callback: CallbackQuery, db_user: User) -> None:
+    """Handle click on Mini App inline button when HTTPS is not configured."""
+    lang = getattr(db_user, "language", None) or settings.DEFAULT_LANGUAGE
+    if lang == "uz":
+        alert_text = "Mini App faqat HTTPS havola bilan ishlaydi. Iltimos, .env da MINI_APP_URL=https://... sozlang."
+    elif lang == "ru":
+        alert_text = "Mini App требует протокол HTTPS. Настройте MINI_APP_URL=https://... в .env."
+    else:
+        alert_text = "Mini App requires HTTPS. Set MINI_APP_URL=https://... in .env."
+    await callback.answer(alert_text, show_alert=True)
+

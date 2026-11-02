@@ -7,10 +7,14 @@ from app.localization.i18n import i18n
 
 def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
     """Create persistent main reply keyboard."""
-    miniapp_button = KeyboardButton(
-        text=i18n.get("btn_open_miniapp", lang=lang),
-        web_app=WebAppInfo(url=settings.MINI_APP_URL),
-    )
+    btn_text = i18n.get("btn_open_miniapp", lang=lang)
+    if settings.is_miniapp_https:
+        miniapp_button = KeyboardButton(
+            text=btn_text,
+            web_app=WebAppInfo(url=settings.MINI_APP_URL.strip()),
+        )
+    else:
+        miniapp_button = KeyboardButton(text=btn_text)
     return ReplyKeyboardMarkup(
         keyboard=[
             [miniapp_button],
@@ -45,14 +49,20 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
 
 def get_main_menu_inline(lang: str = "uz") -> InlineKeyboardMarkup:
     """Create inline keyboard version of main menu."""
+    btn_text = i18n.get("btn_open_miniapp", lang=lang)
+    if settings.is_miniapp_https:
+        top_button = InlineKeyboardButton(
+            text=btn_text,
+            web_app=WebAppInfo(url=settings.MINI_APP_URL.strip()),
+        )
+    else:
+        top_button = InlineKeyboardButton(
+            text=btn_text,
+            callback_data="menu:miniapp_info",
+        )
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=i18n.get("btn_open_miniapp", lang=lang),
-                    web_app=WebAppInfo(url=settings.MINI_APP_URL),
-                ),
-            ],
+            [top_button],
             [
                 InlineKeyboardButton(text=i18n.get("btn_gift_market", lang=lang), callback_data="menu:market"),
                 InlineKeyboardButton(text=i18n.get("btn_collections", lang=lang), callback_data="menu:collections"),

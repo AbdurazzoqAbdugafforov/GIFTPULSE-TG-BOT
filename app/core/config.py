@@ -74,10 +74,20 @@ class Settings(BaseSettings):
     RATE_LIMIT_CALLS_PER_MINUTE: int = Field(default=60, description="Max calls per minute")
     LOG_LEVEL: str = Field(default="INFO", description="Logging level")
     PORT: int = Field(default=8000, description="FastAPI server port")
-    MINI_APP_URL: str = Field(default="http://localhost:8000", description="Public URL for Telegram Mini App")
+    MINI_APP_URL: str = Field(
+        default="",
+        description="Public HTTPS URL for Telegram Mini App (must start with https://)",
+    )
     JWT_SECRET: str = Field(default="giftpulse-super-secret-key-change-in-production", description="Secret key for JWT")
     JWT_ALGORITHM: str = Field(default="HS256", description="Algorithm for JWT")
     SESSION_EXPIRE_HOURS: int = Field(default=72, description="Session expiration in hours")
+
+    @property
+    def is_miniapp_https(self) -> bool:
+        """Check if MINI_APP_URL is a valid HTTPS URL required by Telegram."""
+        if not self.MINI_APP_URL:
+            return False
+        return self.MINI_APP_URL.strip().lower().startswith("https://")
 
     @field_validator("ADMIN_IDS", mode="before")
     @classmethod
