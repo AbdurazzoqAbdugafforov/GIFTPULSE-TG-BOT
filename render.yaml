@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: giftpulse-bot
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: MINI_APP_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DEFAULT_LANGUAGE
+        value: uz
+      - key: DEFAULT_TIMEZONE
+        value: Asia/Tashkent
